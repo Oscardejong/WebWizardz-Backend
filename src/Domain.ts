@@ -11,6 +11,9 @@ class Domain {
     private pricemodels: PriceModel[];
     private websites: Website[];
 
+    getDomainName(): string {
+        return this.domainName;
+    }
     constructor(
         domainName: string,
         Domainstatus: Domainstatus,

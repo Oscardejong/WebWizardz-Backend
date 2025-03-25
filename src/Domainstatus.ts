@@ -4,3 +4,5 @@ enum DomainStatus {
     Deleted = 'Deleted',
     Blocked = 'Blocked',
     }
+
+export default DomainStatus;

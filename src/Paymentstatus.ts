@@ -3,3 +3,5 @@ enum Paymentstatus {
     Failed = 'Failed',
     Success = 'Success'
 }
+
+export default Paymentstatus;
