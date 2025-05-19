@@ -29,7 +29,15 @@ class AccountCatalog {
         this.accounts.push(account);
         return new Result(true, 'Account successfully saved');
     }
-
+    
+    updateAccount(account: Account): void {
+        // Zoek naar het account met dezelfde username en vervang het
+        const index = this.accounts.findIndex(acc => acc.getUserName() === account.getUserName());
+        if (index !== -1) {
+            this.accounts[index] = account;
+        }
+    }
+    
     clear(): void {
         this.accounts = [];
       }

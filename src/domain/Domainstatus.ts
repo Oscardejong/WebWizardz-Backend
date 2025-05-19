@@ -1,8 +1,10 @@
-enum DomainStatus {
-    Online = 'Online',
-    Offline = 'Offline',
-    Deleted = 'Deleted',
-    Blocked = 'Blocked',
-    }
 
+enum DomainStatus {
+    ONLINE = 'ONLINE',
+    OFFLINE = 'OFFLINE',
+    DELETED = 'DELETED',
+    BLOCKED = 'BLOCKED',
+  }
+  
 export default DomainStatus;
+  

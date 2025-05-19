@@ -1,7 +1,7 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../database";
 import Customer from "./Model-Customer";
-import AccountType from "../../domain/AccountType";
+
 
 interface AccountAttributes {
     AccountID: number;
@@ -58,7 +58,13 @@ AccountModel.init(
     }
 );
 
+
+
+// 👇 DEBUG: check of DomainModel geldig is
+
+// Associaties met Customer
 AccountModel.belongsTo(Customer, { foreignKey: "CustomerID" });
 Customer.hasOne(AccountModel, { foreignKey: "CustomerID" });
+
 
 export default AccountModel;

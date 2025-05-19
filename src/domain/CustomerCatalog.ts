@@ -11,6 +11,10 @@ class CustomerCatalog {
         return this.customers;
     }
 
+    getCustomerByEmail(email: string): Customer | undefined {
+        return this.customers.find(customer => customer.getEmail() === email);
+    }
+
 
     constructor() {
         this.repository = new CustomerRepository(); 
@@ -30,6 +34,17 @@ class CustomerCatalog {
       deleteCustomerByEmail(email: string): void {
         this.customers = this.customers.filter(customer => customer.getEmail() !== email);
       }
+
+      updateCustomer(customer: Customer): void {
+        // Zoek naar de klant met dezelfde email en vervang deze
+        const index = this.customers.findIndex(cust => cust.getEmail() === customer.getEmail());
+        if (index !== -1) {
+            this.customers[index] = customer; // Vervang de oude klant door de nieuwe klant
+        }
+    }
+
+    
+
 }
 
 export default CustomerCatalog;

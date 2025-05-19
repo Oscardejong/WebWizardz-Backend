@@ -7,73 +7,30 @@ import AccountCatalog from '../domain/AccountCatalog';
 import CustomerCatalog from '../domain/CustomerCatalog'; 
 import Gender from '../domain/Gender';
 import GenderConverter from '../domain/GenderConverter';
+import CheckPassword from '../domain/CheckPassword';
+import DomainRepository from '../infrastructure/repositories/DomainRepository';
+import Domain from '../domain/Domain';
+
 
 class AccountController {
     private accountRepository: AccountRepository;
     private customerRepository: CustomerRepository;
     private accountCatalog: AccountCatalog;
     private customerCatalog: CustomerCatalog;
-
+    private domainRepository: DomainRepository;
     constructor(
         accountRepo: AccountRepository,
         customerRepo: CustomerRepository,
         accountCatalog: AccountCatalog,
-        customerCatalog: CustomerCatalog
+        customerCatalog: CustomerCatalog,
+        domainRepo: DomainRepository
     ) {
         this.accountRepository = accountRepo;
         this.customerRepository = customerRepo;
         this.accountCatalog = accountCatalog;
         this.customerCatalog = customerCatalog;
+        this.domainRepository = domainRepo;
     }
-
-    async getAllAccountCustomer(req: Request, res: Response): Promise<Response> {
-        try {
-          const accounts = await this.accountRepository.getAllAccounts();
-          const customers = await this.customerRepository.getAllCustomers();
-      
-          // 🧠 Vul de accountCatalog leeg + opnieuw
-          this.accountCatalog.clear(); // Zorg dat deze bestaat in je AccountCatalog
-          this.customerCatalog.clear(); // Zorg dat deze bestaat in je CustomerCatalog
-          accounts.forEach((acc: any) => {
-            const customer = customers.find((cust: any) => cust.CustomerID === acc.CustomerID);
-            if (customer) {
-              const gender = GenderConverter.fromString(customer.gender);
-              const newCustomer = new Customer(customer.firstname, customer.lastname, customer.email, new Date(customer.birthdate), gender);
-              const newAccount = new Account(acc.username, acc.password, acc.accounttype, newCustomer);
-              this.accountCatalog.addAccount(newAccount);
-              this.customerCatalog.addCustomer(newCustomer); 
-
-            }
-          });
-      
-          // Combine voor frontend (zoals je al deed)
-          const customerMap = new Map();
-          customers.forEach((customer: any) => {
-            customerMap.set(customer.CustomerID, customer);
-          });
-      
-          const combinedData = accounts.map((account: any) => {
-            const customer = customerMap.get(account.CustomerID);
-            return {
-              username: account.username,
-              accountType: account.accounttype,
-              firstName: customer.firstname,
-              lastName: customer.lastname,
-              email: customer.email,
-              birthDate: customer.birthdate,
-              gender: customer.gender
-            };
-          });
-      
-          return res.status(200).json(combinedData);
-      
-        } catch (error) {
-          console.error("Error fetching accounts/customers:", error); 
-          return res.status(500).json({ error: 'Something went wrong while fetching account-customer data.' });
-        }
-      }
-      
-    
     async addAccountAndCustomer(req: Request, res: Response): Promise<Response> {
         try {
             console.log('Request body:', req.body);  // Toon de volledige request
@@ -85,6 +42,7 @@ class AccountController {
                     return res.status(400).json({ error: `Missing required field: ${field}` });
                 }
             }
+            
     
             const { firstName, lastName, email, birthdate, gender, username, password, accounttype } = req.body;
     
@@ -135,6 +93,8 @@ class AccountController {
     }
 
     async deleteAccountByUsername(req: Request, res: Response): Promise<Response> {
+       await this.populateCatalogs(); 
+  
         const { username } = req.params;  
       
         try {
@@ -161,6 +121,186 @@ class AccountController {
           }
         }
       }
+
+
+
+    async updateAccountAndCustomer(req: Request, res: Response): Promise<Response> {
+      const { username } = req.params;
+      const { updatedAccountData, updatedCustomerData } = req.body;
+  
+      console.log('Updating account and customer with username:', username);
+      console.log('Updated Account Data:', updatedAccountData);
+      console.log('Updated Customer Data:', updatedCustomerData);
+      
+      try {
+          // Stap 1: Vul de catalogus eerst met de meest recente gegevens
+          await this.populateCatalogs(); 
+  
+          // Stap 2: Haal account op uit de catalogus
+          const account = this.accountCatalog.getAccountByUsername(username);
+  
+          if (!account) {
+              return res.status(404).json({ error: `Account met username "${username}" niet gevonden.` });
+          }
+  
+          const customer = account.getCustomer();
+  
+          // Update domeinobject klant
+          if (updatedCustomerData.firstName) {
+              customer.changeFirstName(updatedCustomerData.firstName);
+          }
+          if (updatedCustomerData.lastName) {
+              customer.changeLastName(updatedCustomerData.lastName);
+          }
+          if (updatedCustomerData.email) {
+              customer.changeEmail(updatedCustomerData.email);
+          }
+          if (updatedCustomerData.birthdate) {
+              customer.changeBirthdate(new Date(updatedCustomerData.birthdate));
+          }
+          if (updatedCustomerData.gender) {
+              customer.changeGender(updatedCustomerData.gender);
+          }
+  
+          // Wachtwoord wijzigen (optioneel)
+          if (updatedAccountData.password) {
+              const oldPassword = updatedAccountData.oldPassword;
+              const newPassword = updatedAccountData.password;
+  
+              const passwordChangeResult = account.changePassword(oldPassword, newPassword, CheckPassword);
+  
+              if (!passwordChangeResult.success) {
+                  return res.status(400).json({ error: passwordChangeResult.message });
+              }
+          }
+  
+          // Werk de objecten bij in de in-memory catalogus
+          this.accountCatalog.updateAccount(account);
+          this.customerCatalog.updateCustomer(customer);
+  
+          // ✅ Werk database bij via repository
+          await this.accountRepository.updateAccountAndCustomerByUsername(username, {
+              password: account.getPassword(),
+              accounttype: account.getAccountType()
+          }, {
+              firstname: customer.getFirstName(),
+              lastname: customer.getLastName(),
+              email: customer.getEmail(),
+              birthdate: customer.getBirthdate(),
+              gender: customer.getGender()
+          });
+  
+          return res.status(200).json({
+              message: 'Account en klant succesvol bijgewerkt.',
+              account: account,
+              customer: customer
+          });
+  
+      } catch (error: any) {
+          console.error('Fout bij het bijwerken van account/klant:', error.message);
+          return res.status(500).json({ error: 'Er is iets mis gegaan bij het bijwerken van het account en de klant.' });
+      }
+  }
+  
+  // Functie om de catalogus bij te werken met gegevens uit de database
+  async populateCatalogs(): Promise<void> {
+      const accounts = await this.accountRepository.getAllAccounts();
+      const customers = await this.customerRepository.getAllCustomers();
+  
+      this.accountCatalog.clear(); 
+      this.customerCatalog.clear(); 
+  
+      accounts.forEach((acc: any) => {
+          const customer = customers.find((cust: any) => cust.CustomerID === acc.CustomerID);
+          if (customer) {
+              const gender = GenderConverter.fromString(customer.gender);
+              const newCustomer = new Customer(customer.firstname, customer.lastname, customer.email, new Date(customer.birthdate), gender);
+              const newAccount = new Account(acc.username, acc.password, acc.accounttype, newCustomer);
+              this.accountCatalog.addAccount(newAccount);
+              this.customerCatalog.addCustomer(newCustomer);
+          }
+      });
+  }
+
+  
+  
+  async getAllAccountCustomer(req: Request, res: Response): Promise<Response> {
+    try {
+        // Stap 1: Haal alle accounts en klanten op
+        const accounts = await this.accountRepository.getAllAccounts();
+        const customers = await this.customerRepository.getAllCustomers();
+
+        // Haal alle domeinen op per account
+        const domains = await this.domainRepository.getAllDomains();  // Dit haalt alle domeinen op, zorg ervoor dat deze functie goed werkt.
+        
+        this.accountCatalog.clear(); 
+        this.customerCatalog.clear(); 
+
+        // Stap 2: Verwerk de accounts en koppel klanten
+        accounts.forEach((acc: any) => {
+            const customer = customers.find((cust: any) => cust.CustomerID === acc.CustomerID);
+            if (customer) {
+                const gender = GenderConverter.fromString(customer.gender);
+                const newCustomer = new Customer(customer.firstname, customer.lastname, customer.email, new Date(customer.birthdate), gender);
+                const newAccount = new Account(acc.username, acc.password, acc.accounttype, newCustomer);
+                
+                // Stap 3: Haal de domeinen op voor dit account
+                const accountDomains = domains.filter((domain: any) => domain.username === acc.username);
+                
+                // Voeg domeinen toe aan account
+                accountDomains.forEach((domain: any) => {
+                    const domainInstance = new Domain(domain.domainname, domain.domainstatus, domain.startdatetime, domain.enddatetime);
+                    newAccount.tryAddDomain(domainInstance);  // Zorg ervoor dat de Account klasse een addDomain methode heeft.
+                });
+
+                // Voeg toe aan de catalogus
+                this.accountCatalog.addAccount(newAccount);
+                this.customerCatalog.addCustomer(newCustomer); 
+            }
+        });
+
+        // Stap 4: Combineer de gegevens voor de frontend
+        const customerMap = new Map();
+        customers.forEach((customer: any) => {
+            customerMap.set(customer.CustomerID, customer);
+        });
+
+        // Stap 5: Combineer account- en domeingegevens
+        const combinedData = accounts.map((account: any) => {
+            const customer = customerMap.get(account.CustomerID);
+
+            // Verkrijg de domeinen die bij dit account horen (als ze zijn toegevoegd)
+            const accountInstance = this.accountCatalog.getAccountByUsername(account.username);
+            const domains = accountInstance ? accountInstance.getDomains() : [];
+
+            return {
+                username: account.username,
+                accountType: account.accounttype,
+                firstName: customer.firstname,
+                lastName: customer.lastname,
+                email: customer.email,
+                birthDate: customer.birthdate,
+                gender: customer.gender,
+                domains: domains.map((domain: Domain) => ({
+                    domainName: domain.getDomainName(),
+                    domainStatus: domain.getDomainstatus(),
+                    startDate: domain.getStartDate(),
+                    endDate: domain.getEndDate(),
+                }))
+            };
+        });
+
+        return res.status(200).json(combinedData);
+
+    } catch (error) {
+        console.error("Error fetching accounts/customers:", error); 
+        return res.status(500).json({ error: 'Something went wrong while fetching account-customer data.' });
+    }
+}
+
+      
+    
+
     
 }
 

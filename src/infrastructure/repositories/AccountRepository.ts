@@ -24,6 +24,11 @@ class AccountRepository {
         return await Account.findAll();  
     }
 
+    async getUsernameByAccountId(accountId: number): Promise<string | null> {
+        const account = await Account.findOne({ where: { AccountID: accountId } });
+        return account ? account.username : null;
+    }
+
     async getAccountByUsername(username: string): Promise<Account | null> {
         return await Account.findOne({
             where: {
@@ -49,6 +54,42 @@ class AccountRepository {
             await customer.destroy();
         }
     }
+
+    async updateAccountAndCustomerByUsername(
+        username: string,
+        updatedAccountData: Partial<Account>,
+        updatedCustomerData: Partial<Customer>
+    ): Promise<{ account: Account; customer: Customer } | null> {
+        const account = await Account.findOne({ where: { username } });
+    
+        if (!account) {
+            console.error(`Account met username "${username}" niet gevonden.`);
+            return null;
+        }
+    
+        const customer = await Customer.findOne({ where: { CustomerID: account.CustomerID } });
+    
+        if (!customer) {
+            console.error(`Customer met ID ${account.CustomerID} niet gevonden.`);
+            return null;
+        }
+    
+        // Wachtwoord versleutelen als het aangepast wordt
+        if (updatedAccountData.password) {
+            updatedAccountData.password = bcryptjs.hashSync(updatedAccountData.password, 10);
+        }
+    
+        await account.update(updatedAccountData);
+        await customer.update(updatedCustomerData);
+    
+        console.log("Account & Customer bijgewerkt:");
+        console.log("Account:", account.toJSON());
+        console.log("Customer:", customer.toJSON());
+    
+        return { account, customer };
+    }
+    
+    
 
 }
 

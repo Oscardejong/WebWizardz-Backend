@@ -14,6 +14,9 @@ class Account {
     private payments: Payment[];
     private domains: Domain[];
 
+    getUsername(): string {
+        return this.username;
+    }
     getAccountType(): AccountType {
         return this.accountType;
     }
@@ -57,11 +60,18 @@ class Account {
         }
     }
 
-    tryAddPayment(): Result {
+    tryAddPayment(payment: Payment): Result {
+        if (!payment) {
+            return new Result(false, 'Invalid payment');
+        }
+        this.payments.push(payment);        
         return new Result(true, 'Payment added successfully');
     }
-
-    tryAddDomain(): Result {
+    tryAddDomain(domain: Domain): Result {
+        if (!domain) {
+            return new Result(false, 'Invalid domain');
+        }
+        this.domains.push(domain);
         return new Result(true, 'Domain added successfully');
     }
 
