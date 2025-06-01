@@ -23,9 +23,14 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: npm install, build, and test
+      - name: npm install dependencies
+        run: npm install
+
+      - name: Fix Jest executable permissions
+        run: chmod +x ./node_modules/.bin/jest
+
+      - name: npm build and test
         run: |
-          npm install
           npm run build --if-present
           npm run test --if-present
 
@@ -71,8 +76,3 @@ jobs:
           app-name: 'Webwizardz-backendV2'
           slot-name: 'Production'
           package: .
-
- - name: Make Jest executable (fix for some runners)
-  run: chmod +x ./node_modules/.bin/jest
- 
-          
