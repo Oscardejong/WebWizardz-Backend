@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node src/app.ts",
-    "test": "jest",
+    "test": "npx jest",
     "test:watch": "jest --watch"
   },
   "keywords": [],
