@@ -71,4 +71,8 @@ jobs:
           app-name: 'Webwizardz-backendV2'
           slot-name: 'Production'
           package: .
+
+ - name: Make Jest executable (fix for some runners)
+  run: chmod +x ./node_modules/.bin/jest
+ 
           
