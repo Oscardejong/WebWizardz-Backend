@@ -1,9 +1,9 @@
 import { Model, DataTypes, Optional, Association } from 'sequelize';
 import sequelize from '../database';
 import DomainStatus from '../../domain/Domainstatus';
-import AccountModel from './Model-Account';  // Let op: zelfde naam als export in AccountModel.ts
+import AccountModel from './Model-Account';
 
-interface DomainAttributes {
+export interface DomainAttributes {
   DomainID: number;
   domainname: string;
   domainstatus: DomainStatus;
@@ -67,10 +67,6 @@ DomainModel.init(
   }
 );
 
-// Associatie met AccountModel
-DomainModel.belongsTo(AccountModel, {
-  foreignKey: 'AccountID',
-  as: 'account',
-});
+
 
 export default DomainModel;

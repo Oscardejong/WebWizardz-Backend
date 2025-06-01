@@ -1,21 +1,31 @@
+import { Request, Response } from "express";
 import DomainRepository from "../infrastructure/repositories/DomainRepository";
 import AccountRepository from "../infrastructure/repositories/AccountRepository";
 import DomainStatus from "../domain/Domainstatus";
 import Result from "../domain/Result";
 import Domain from "../domain/Domain";
 import DomainService from "../domain/Domainservice";
+import IAccountCatalog from "../domain/IAccountCatalog";
+import ICheckDomain from "../domain/ICheckDomain";
+import DomainDateCheck  from "../domain/DomainDateCheck";
+import DomainNameCheck from "../domain/DomainNameCheck";
+import DomainPeriodOverlapCheck from "../domain/DomainPeriodOverlapCheck";
+import ICheckDomainUpdate from "../domain/ICheckDomainUpdate";
+import DomainPeriodCheckDate from "../domain/DomainPeriodCheckDate";
+import DomainPeriodCheckStatus from "../domain/DomainPeriodCheckStatus";
 
-import { Request, Response } from "express";
 
 class DomainController {
     private domainRepository: DomainRepository;
     private accountRepository: AccountRepository;
     private domainService: DomainService;
+    private accountCatalog: IAccountCatalog;
   
-    constructor(domainRepository: DomainRepository, accountRepository: AccountRepository) {
+    constructor(domainRepository: DomainRepository, accountRepository: AccountRepository, accountCatalog: IAccountCatalog) {
       this.accountRepository = accountRepository;
       this.domainRepository = domainRepository;
       this.domainService = new DomainService(this.domainRepository);
+      this.accountCatalog = accountCatalog;
     } 
   
     async createDomain(req: Request, res: Response): Promise<void> {
@@ -54,6 +64,8 @@ class DomainController {
           new Date(enddatetime)
         );
   
+
+
         const accountid = await this.accountRepository.getAccountByUsername(username);
         if (!accountid) {
           res.status(404).json({
@@ -62,7 +74,28 @@ class DomainController {
           });
           return;
         }
-        // 2. Gebruik domainRepository om het domein op te slaan
+
+        // -------- Business-validatie via ICheckAccountAndUser ---------------
+        // *1 stap: lijst van checks opbouwen
+
+        const validators: ICheckDomain[] = [
+          new DomainDateCheck(this.accountCatalog),
+          new DomainNameCheck(this.accountCatalog)
+        
+        ];
+
+        // *2 stap: lijst van checks opbouwen
+        for (const validator of validators) {
+                const result = validator.checkDomain(domain, this.accountCatalog);
+                if (!result.success) {
+                res.status(400).json({ error: result.message }); 
+                return; 
+              }
+
+            }
+
+
+        // 2 Gebruik domainRepository om het domein op te slaan
         const createdDomain = await this.domainRepository.createDomain({
           domainname: domain.getDomainName(),
           domainstatus: domain.getDomainstatus(),
@@ -126,6 +159,68 @@ class DomainController {
           });
       }
     }
+
+
+/* ---------- UPDATE PERIOD ---------- */
+async updateDomainPeriod(req: Request, res: Response): Promise<void> {
+  try {
+    const { domainname } = req.params;
+    const { startdatetime, enddatetime } = req.body;
+
+    /* 1) Basis-validatie input */
+    const newStart = new Date(startdatetime);
+    const newEnd   = new Date(enddatetime);
+    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime()) || newStart >= newEnd) {
+      res.status(400).json({ success: false, message: 'Invalid date range' });
+      return;
+    }
+
+    /* 2) Huidige domein ophalen */
+    const current = await this.domainRepository.getDomainByDomainName(domainname);
+    if (!current) {
+      res.status(404).json({ success: false, message: 'Domain not found' });
+      return;
+    }
+
+    /* 3) Domeinobject voor validators */
+    const domainObj = new Domain(
+      current.domainname,
+      current.domainstatus,
+      current.startdatetime,
+      current.enddatetime
+    );
+
+    /* 4) Lijst met ICheckDomainUpdate-validators */
+    const updateValidators: ICheckDomainUpdate[] = [
+      new DomainPeriodOverlapCheck(this.accountCatalog)
+      , new DomainPeriodCheckDate(this.accountCatalog),
+      new DomainPeriodCheckStatus(this.accountCatalog)
+      // voeg hier eventueel extra update-validators toe
+    ];
+
+    /* 5) Loop door validators */
+    for (const v of updateValidators) {
+      const result = v.checkDomainUpdate(domainObj, newStart, newEnd);
+      if (!result.success) {
+        res.status(400).json({ success: false, message: result.message });
+        return;
+      }
+    }
+
+    /* 6) Repo-update uitvoeren */
+    const updated = await this.domainRepository.updateDomainPeriod(domainname, newStart, newEnd);
+
+    res.status(200).json({
+      success: true,
+      message: 'Domain period updated',
+      data: updated
+    });
+  } catch (error: any) {
+    console.error('updateDomainPeriod error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 }
   
 export default DomainController;

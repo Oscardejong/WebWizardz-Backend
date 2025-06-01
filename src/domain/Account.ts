@@ -11,7 +11,6 @@ class Account {
     private accountType: AccountType;
     private customer: Customer
 
-    private payments: Payment[];
     private domains: Domain[];
 
     getUsername(): string {
@@ -27,9 +26,9 @@ class Account {
         return this.username;
     }
 
-    getPayments(): readonly Payment[] { 
-        return this.payments;
-    }
+    // getPayments(): readonly Payment[] { 
+    //     return this.payments;
+    // }
     getDomains(): readonly Domain[] { 
         return this.domains;
     }
@@ -43,7 +42,7 @@ class Account {
         this.password = password;
         this.accountType = accountType;
 
-        this.payments = [];
+        // this.payments = [];
         this.domains = [];
     }
 
@@ -60,13 +59,13 @@ class Account {
         }
     }
 
-    tryAddPayment(payment: Payment): Result {
-        if (!payment) {
-            return new Result(false, 'Invalid payment');
-        }
-        this.payments.push(payment);        
-        return new Result(true, 'Payment added successfully');
-    }
+    // tryAddPayment(payment: Payment): Result {
+    //     if (!payment) {
+    //         return new Result(false, 'Invalid payment');
+    //     }
+    //     this.payments.push(payment);        
+    //     return new Result(true, 'Payment added successfully');
+    // }
     tryAddDomain(domain: Domain): Result {
         if (!domain) {
             return new Result(false, 'Invalid domain');
@@ -75,16 +74,6 @@ class Account {
         return new Result(true, 'Domain added successfully');
     }
 
-    changePassword(oldPassword: string, newPassword: string, checkPassword: typeof CheckPassword): Result {
-        const validationResult = checkPassword(oldPassword, newPassword, this);
-
-        if (!validationResult.success) {
-            return validationResult;
-        }
-
-        this.password = newPassword;
-        return new Result(true, 'Password changed successfully');
-    }
 }
 
 export default Account;

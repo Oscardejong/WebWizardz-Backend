@@ -68,6 +68,59 @@ class Domain {
     getWebsites(): Website[] {
         return this.websites;
     }
+
+    hasWebsite(): boolean {
+    return this.websites.length > 0;
+  }
+    
+ static fromModel(domainModel: any): Domain {
+  const domain = new Domain(
+    domainModel.domainname,
+    domainModel.domainstatus as Domainstatus,
+    new Date(domainModel.startdatetime),
+    new Date(domainModel.enddatetime)
+  );
+
+  if (domainModel.websites && Array.isArray(domainModel.websites)) {
+    for (const websiteModel of domainModel.websites) {
+      const fileInfo = {
+        path: websiteModel.path || '',
+        originalname: websiteModel.originalname || '',
+        size: websiteModel.size || 0,
+        mimetype: websiteModel.mimetype || '',
+        uploadedat: websiteModel.uploadedat ? new Date(websiteModel.uploadedat) : new Date(),
+      };
+
+      const website = new Website(
+        websiteModel.name,
+        websiteModel.status,
+        websiteModel.type,
+        fileInfo
+      );
+
+      domain.tryAddWebsite(website);
+    }
+  }
+
+  return domain;
+}
+
+
+
+    // Domain.ts
+tryAddWebsite(website: Website): Result {
+  // if (this.Domainstatus != Domainstatus.ONLINE) {
+  //   return new Result(false, `Cannot link website, status ${this.Domainstatus} is incorrect.`);
+  // }
+
+  if (this.websites.length > 0) {
+    return new Result(false, 'This domain has allready a website');
+  }
+
+  this.websites.push(website);
+  return new Result(true, 'Website succesfull added.');
+}
+
 }
 
 export default Domain;

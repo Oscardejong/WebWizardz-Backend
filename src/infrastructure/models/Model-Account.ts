@@ -62,9 +62,5 @@ AccountModel.init(
 
 // 👇 DEBUG: check of DomainModel geldig is
 
-// Associaties met Customer
-AccountModel.belongsTo(Customer, { foreignKey: "CustomerID" });
-Customer.hasOne(AccountModel, { foreignKey: "CustomerID" });
-
 
 export default AccountModel;

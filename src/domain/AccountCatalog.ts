@@ -1,8 +1,9 @@
 import AccountRepository from "../infrastructure/repositories/AccountRepository";
 import Result from "./Result";
 import Account from "./Account";
+import IAccountCatalog from "./IAccountCatalog";
 
-class AccountCatalog {
+class AccountCatalog implements IAccountCatalog {
     private accounts: Account[] = []; 
     private repository: AccountRepository;
 
@@ -15,16 +16,6 @@ class AccountCatalog {
         this.repository = new AccountRepository(); 
     }
 
-    // async addAccount(accountData: Account): Promise<Result> {
-    //     try {
-    //         // const account = await this.repository.createAccount(accountData);
-    //         this.accounts.push(account);
-    //         return new Result(true, 'Account successfully saved');
-    //     } catch (error) {
-    //         console.error('Error saving account:', error);
-    //         return new Result(false, 'Account could not be saved');
-    //     }
-    // }
     public addAccount(account: Account): Result {
         this.accounts.push(account);
         return new Result(true, 'Account successfully saved');

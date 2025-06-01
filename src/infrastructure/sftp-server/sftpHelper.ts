@@ -20,6 +20,7 @@ class SftpHelper {
   }
 
   public async pushDomainAssets(
+    name: string,
     domainname: string,
     start: Date,
     end: Date,
@@ -32,6 +33,7 @@ class SftpHelper {
     const tmpFile = path.join(tmpDir, `${domainname}.json`);
 
     const config = {
+      name,
       domainname,
       startdatetime: start.toISOString(),
       enddatetime: end.toISOString(),
@@ -61,6 +63,29 @@ class SftpHelper {
       await fs.unlink(tmpFile);
     }
   }
+
+  
+ public async deleteDomainAssets(domainname: string): Promise<void> {
+    try {
+      await this.sftp.connect({
+        host: this.config.host,
+        port: this.config.port ?? 22,
+        username: this.config.username,
+        password: this.config.password,
+      });
+
+      const remoteDir = `/${domainname}`;
+      await this.sftp.deleteDir(remoteDir);
+
+    } catch (error) {
+      console.error("SFTP delete failed:", error);
+      throw error;  
+    } finally {
+      await this.sftp.disconnect();
+    }
+  }
+
+
 }
 
 export default SftpHelper;

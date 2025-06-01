@@ -76,6 +76,25 @@ class DomainRepository {
       throw new Error(`Failed to fetch domain with ID ${domainId}: ${err.message}`);
     }
   }
+  async updateDomainPeriod(domainname: string, newStart: Date, newEnd: Date): Promise<DomainModel> {
+  try {
+    const domain = await DomainModel.findOne({ where: { domainname } });
+
+    if (!domain) {
+      throw new Error(`Domain "${domainname}" does not exist.`);
+    }
+
+    domain.startdatetime = newStart;
+    domain.enddatetime = newEnd;
+
+    await domain.save();
+
+    return domain;
+  } catch (err: any) {
+    throw new Error(`Failed to update domain period for "${domainname}": ${err.message}`);
+  }
+}
+
 
 }
 

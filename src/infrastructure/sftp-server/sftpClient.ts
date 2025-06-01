@@ -28,6 +28,16 @@ class SftpClientWrapper {
     await this.client.put(local, remote);
   }
 
+   async deleteDir(remotePath: string) {
+    // Bestaat de map?
+    const exists = await this.client.exists(remotePath);
+    if (exists) {
+      // Recursief verwijderen van bestanden en mappen
+      // ssh2-sftp-client heeft een 'rmdir' met recursive optie
+      await this.client.rmdir(remotePath, true); // true = recursive
+    }
+  }
+
   async disconnect() {
     await this.client.end();
   }

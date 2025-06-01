@@ -93,7 +93,6 @@ WebsiteModel.init(
   }
 );
 
-// Associatie
-WebsiteModel.belongsTo(DomainModel, { foreignKey: 'DomainID', as: 'domain' });
+
 
 export default WebsiteModel;

@@ -2,8 +2,9 @@ import CustomerRepository from "../infrastructure/repositories/CustomerRepositor
 import Result from "./Result";
 import Customer from "./Customer";
 import CustomerModel from "../infrastructure/models/Model-Customer";
+import ICustomerCatalog from "./ICustomerCatalog";
 
-class CustomerCatalog {
+class CustomerCatalog implements ICustomerCatalog{
     private customers: Customer[] = []; 
     private repository: CustomerRepository;
 

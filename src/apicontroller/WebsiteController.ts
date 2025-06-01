@@ -6,20 +6,27 @@ import WebsiteType from "../domain/WebsiteType";
 import Website from "../domain/Website";
 import { FileInfo } from "../domain/FileInfo";
 import SftpHelper from "../infrastructure/sftp-server/sftpHelper";
+import Domain from "../domain/Domain";
+import { isFileValid } from "../domain/WebsiteCheckFile";
+import ICheckDomainHasWebsite from "../domain/ICheckDomainhasWebsite";
+import IAccountCatalog from "../domain/IAccountCatalog";
+import WebsiteCheckDomain from "../domain/WebsiteCheckDomain";
+import WebsiteCheckName from "../domain/WebsiteCheckName";
+import ICheckWebsite from "../domain/ICheckWebsite";
+import WebsiteService from "../domain/Websiteservice";
 
 class WebsiteController {
-  private websiteRepository: WebsiteRepository;
-  private domainRepository: DomainRepository;
+  private websiteRepository = new WebsiteRepository();
+  private domainRepository = new DomainRepository();
+  private websiteService = new WebsiteService(this.websiteRepository);
+  private websiteCheckDomain: ICheckDomainHasWebsite;
 
-  constructor() {
-    this.websiteRepository = new WebsiteRepository();
-    this.domainRepository  = new DomainRepository();
+  constructor(private accountCatalog: IAccountCatalog) {
+    this.websiteCheckDomain = new WebsiteCheckDomain(this.accountCatalog);
   }
 
-  // ---------- CREATE ----------
   public createWebsite = async (req: Request, res: Response): Promise<void> => {
     try {
-      /* 1. Validate required fields */
       const requiredFields = ["name", "domainname"];
       for (const field of requiredFields) {
         if (!req.body[field]) {
@@ -28,18 +35,16 @@ class WebsiteController {
         }
       }
 
-      /* 2. Pull values from body */
       const {
         name,
         domainname,
         status = Status.Active,
-        type   = WebsiteType.Poster,
+        type = WebsiteType.Poster,
         uploadedat,
       } = req.body;
 
       const file = req.file;
 
-      /* 3. Compose fileInfo (optional) */
       const fileInfo: FileInfo | undefined = file
         ? {
             path: file.path,
@@ -50,25 +55,51 @@ class WebsiteController {
           }
         : undefined;
 
-      /* 4. Find domain by name */
-      const domain = await this.domainRepository.getDomainByDomainName(domainname);
-      if (!domain) {
+      const domainModel = await this.domainRepository.getDomainByDomainName(domainname);
+      if (!domainModel) {
         res.status(400).json({ success: false, message: "Domain does not exist." });
         return;
       }
 
-      const DomainID = domain.DomainID;
+      const DomainID = domainModel.DomainID;
+      const domain = Domain.fromModel(domainModel);
+      const websiteDomainObj = new Website(name, status, type, fileInfo);
 
-      /* 5. Poster requires file */
       if (type === WebsiteType.Poster && !file) {
         res.status(400).json({ success: false, message: "File upload is required when website type is Poster." });
         return;
       }
 
-      /* 6. Build domain‑layer Website object (for validation) */
-      const websiteDomainObj = new Website(name, status, type, fileInfo);
+      const fileValidation = isFileValid(fileInfo);
+      if (!fileValidation.success) {
+        res.status(400).json({ success: false, message: fileValidation.message });
+        return;
+      }
 
-      /* 7. Persist */
+      const domainCheckResult = this.websiteCheckDomain.checkDomainHasWebsite(domainname, this.accountCatalog);
+      if (!domainCheckResult.success) {
+        res.status(400).json({ success: false, message: domainCheckResult.message });
+        return;
+      }
+
+      const validators: ICheckWebsite[] = [
+        new WebsiteCheckName(this.accountCatalog),
+      ];
+
+      for (const validator of validators) {
+        const result = validator.check(websiteDomainObj, this.accountCatalog);
+        if (!result.success) {
+          res.status(400).json({ success: false, message: result.message });
+          return;
+        }
+      }
+
+      const validation = domain.tryAddWebsite(websiteDomainObj);
+      if (!validation.success) {
+        res.status(400).json({ success: false, message: validation.message });
+        return;
+      }
+
       const createdWebsite = await this.websiteRepository.createWebsite({
         name: websiteDomainObj.getName(),
         status: websiteDomainObj.getStatus(),
@@ -83,7 +114,6 @@ class WebsiteController {
 
       res.status(201).json({ success: true, message: "Website successfully created.", data: createdWebsite });
 
-      /* 8. Fire‑and‑forget SFTP upload — errors only logged */
       try {
         const sftp = new SftpHelper({
           host: process.env.SFTP_HOST!,
@@ -92,11 +122,11 @@ class WebsiteController {
           password: process.env.SFTP_PASS!,
         });
 
-        // Let op: filePath en fileName alleen meegeven als fileInfo bestaat
         await sftp.pushDomainAssets(
+          name,
           domainname,
-          domain.startdatetime,
-          domain.enddatetime,
+          domain.getStartDate(),
+          domain.getEndDate(),
           type,
           fileInfo?.path,
           fileInfo?.originalname
@@ -110,10 +140,9 @@ class WebsiteController {
     }
   };
 
-  // ---------- READ ----------
   public getAllWebsites = async (req: Request, res: Response): Promise<void> => {
     try {
-      const websites = await this.websiteRepository.getAllWebsites();
+      const websites = await this.websiteService.listAllWebsites();
       res.status(200).json({ success: true, data: websites });
     } catch (error: any) {
       console.error("Error fetching websites:", error);
@@ -121,7 +150,6 @@ class WebsiteController {
     }
   };
 
-  // ---------- DELETE ----------
   public deleteWebsiteByName = async (req: Request, res: Response): Promise<void> => {
     try {
       const { name } = req.params;
@@ -146,4 +174,4 @@ class WebsiteController {
   };
 }
 
-export default new WebsiteController();
+export default WebsiteController;
